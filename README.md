@@ -16,6 +16,9 @@
 
 - Python 3.8以上
 - Google Gemini API キー
+  - [Google AI Studio](https://ai.google.dev/)からAPIキーを取得する必要があります
+  - Gemini APIは一部の国や地域では利用できない場合があります
+  - 使用するモデル（デフォルト: gemini-pro）がGoogle AIのAPIで利用可能であることを確認してください
 
 ## セットアップ
 
@@ -62,6 +65,8 @@ API_PORT=8000
 # Geminiモデル設定
 GEMINI_MODEL_NAME=gemini-pro
 ```
+
+**重要**: 使用するモデル名（`GEMINI_MODEL_NAME`）は、Google AIのAPIで提供されているモデルと一致している必要があります。モデルの可用性は地域やアカウントの種類によって異なる場合があります。最新の情報は[Google AIのドキュメント](https://ai.google.dev/docs)を参照してください。
 
 ## 使用方法
 
