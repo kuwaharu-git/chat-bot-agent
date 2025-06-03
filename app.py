@@ -20,6 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 静的ファイル提供の設定
+# カレントディレクトリの静的ファイルを提供
+app.mount("/static", StaticFiles(directory="."), name="static")
+
 # グローバルチャットボットインスタンス
 chatbot = GeminiChatbot(use_cache=True)
 
@@ -59,8 +63,18 @@ class CachedSiteInfo(BaseModel):
 
 @app.get("/")
 async def get_index():
-    """ルートパスでフロントエンドを提供する"""
-    return FileResponse("simple_frontend.html")
+    """ルートパスで管理画面を提供する"""
+    return FileResponse("admin.html")
+
+@app.get("/admin.html")
+async def get_admin():
+    """管理画面を提供する"""
+    return FileResponse("admin.html")
+
+@app.get("/chat.html")
+async def get_chat():
+    """チャット画面を提供する"""
+    return FileResponse("chat.html")
 
 @app.post("/initialize", response_model=ChatResponse)
 async def initialize_chatbot(request: URLRequest = Body(...)):
