@@ -183,12 +183,100 @@
             margin-left: 0;
             color: #666;
         }
+        
+        /* キャッシュ関連のスタイル */
+        .cache-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .cache-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+        .cache-hit {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .cache-miss {
+            background-color: #fbe9e7;
+            color: #c62828;
+        }
+        .cache-controls {
+            margin-top: 10px;
+        }
+        .cache-controls button {
+            background: none;
+            border: none;
+            color: #2196F3;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        
+        /* キャッシュサイト一覧のスタイル */
+        .cached-sites-container {
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .cached-sites-container.visible {
+            display: block;
+        }
+        .cached-site-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .cached-site-item:hover {
+            background-color: #f5f5f5;
+        }
+        .cached-site-item:last-child {
+            border-bottom: none;
+        }
+        .site-title {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        .site-url {
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+        }
+        .site-meta {
+            font-size: 12px;
+            color: #999;
+        }
+        .site-select-btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .site-select-btn:hover {
+            background-color: #0b7dda;
+        }
     </style>
 </head>
 <body>
     <h1>ウェブサイト情報チャットボット</h1>
     
-    <div class="status" id="status">URLを入力してチャットボットを初期化してください</div>
+    <div class="status" id="status">URLを入力するか、キャッシュされたサイトを選択してください</div>
     
     <div class="url-form">
         <div class="url-input-row">
@@ -211,6 +299,31 @@
                 <input type="number" id="max-depth" value="2" min="1" max="5">
                 <span>（深いほど広範囲の情報を取得できますが、関連性が薄くなる可能性があります）</span>
             </div>
+            <div class="option-row">
+                <label for="use-cache">キャッシュを使用:</label>
+                <input type="checkbox" id="use-cache" checked>
+                <span>（過去に取得したデータを再利用して高速化します）</span>
+            </div>
+            <div class="option-row">
+                <label for="force-refresh">強制更新:</label>
+                <input type="checkbox" id="force-refresh">
+                <span>（キャッシュを無視して新しいデータを取得します）</span>
+            </div>
+        </div>
+        
+        <div class="cache-info" id="cache-info" style="display: none;">
+            <div>キャッシュ統計: <span id="cache-stats">読み込み中...</span></div>
+            <div class="cache-controls">
+                <button id="clear-cache">期限切れキャッシュを削除</button>
+                <button id="show-cached-sites">キャッシュ済みサイトを表示/非表示</button>
+            </div>
+            
+            <!-- キャッシュ済みサイト一覧 -->
+            <div class="cached-sites-container" id="cached-sites-container">
+                <div id="cached-sites-list">
+                    <!-- サイト一覧がここに表示されます -->
+                </div>
+            </div>
         </div>
     </div>
     
@@ -230,6 +343,8 @@
             const includeSubpages = document.getElementById('include-subpages');
             const maxPages = document.getElementById('max-pages');
             const maxDepth = document.getElementById('max-depth');
+            const useCache = document.getElementById('use-cache');
+            const forceRefresh = document.getElementById('force-refresh');
             const toggleAdvanced = document.getElementById('toggle-advanced');
             const advancedOptions = document.getElementById('advanced-options');
             const initializeBtn = document.getElementById('initialize-btn');
@@ -237,6 +352,12 @@
             const sendBtn = document.getElementById('send-btn');
             const chatContainer = document.getElementById('chat-container');
             const statusElement = document.getElementById('status');
+            const cacheInfo = document.getElementById('cache-info');
+            const cacheStats = document.getElementById('cache-stats');
+            const clearCache = document.getElementById('clear-cache');
+            const showCachedSites = document.getElementById('show-cached-sites');
+            const cachedSitesContainer = document.getElementById('cached-sites-container');
+            const cachedSitesList = document.getElementById('cached-sites-list');
             
             // マークダウンのオプション設定
             marked.setOptions({
@@ -251,6 +372,171 @@
                 }
             });
             
+            // APIのベースURL（必要に応じて変更）
+            const API_BASE_URL = 'http://localhost:8000';
+            
+            // キャッシュ統計情報を取得
+            function loadCacheStats() {
+                if (useCache.checked) {
+                    cacheInfo.style.display = 'block';
+                    
+                    fetch(`${API_BASE_URL}/cache/stats`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.sites_count > 0) {
+                                cacheStats.textContent = `${data.sites_count}サイト, ${data.urls_count}URL, ${Math.round(data.db_size_kb)}KB`;
+                            } else {
+                                cacheStats.textContent = 'キャッシュなし';
+                            }
+                        })
+                        .catch(error => {
+                            cacheStats.textContent = 'エラー: 統計情報を取得できません';
+                        });
+                } else {
+                    cacheInfo.style.display = 'none';
+                }
+            }
+            
+            // キャッシュ済みサイト一覧を読み込む
+            function loadCachedSites() {
+                cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">読み込み中...</div>';
+                
+                fetch(`${API_BASE_URL}/cache/sites`)
+                    .then(response => response.json())
+                    .then(sites => {
+                        cachedSitesList.innerHTML = '';
+                        
+                        if (sites.length === 0) {
+                            cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">キャッシュされたサイトはありません</div>';
+                            return;
+                        }
+                        
+                        sites.forEach(site => {
+                            const siteItem = document.createElement('div');
+                            siteItem.className = 'cached-site-item';
+                            
+                            const siteInfo = document.createElement('div');
+                            
+                            const siteTitle = document.createElement('div');
+                            siteTitle.className = 'site-title';
+                            siteTitle.textContent = site.title || 'タイトルなし';
+                            
+                            const siteUrl = document.createElement('div');
+                            siteUrl.className = 'site-url';
+                            siteUrl.textContent = site.url;
+                            
+                            const siteMeta = document.createElement('div');
+                            siteMeta.className = 'site-meta';
+                            
+                            // 日時をフォーマット
+                            const date = new Date(site.last_scraped);
+                            const formattedDate = `${date.getFullYear()}/${(date.getMonth()+1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                            
+                            siteMeta.textContent = `${site.pages_count}ページ・${formattedDate}取得`;
+                            
+                            siteInfo.appendChild(siteTitle);
+                            siteInfo.appendChild(siteUrl);
+                            siteInfo.appendChild(siteMeta);
+                            
+                            const selectBtn = document.createElement('button');
+                            selectBtn.className = 'site-select-btn';
+                            selectBtn.textContent = '選択';
+                            selectBtn.addEventListener('click', function() {
+                                // サイトIDが必ず数値であることを確認
+                                const siteId = parseInt(site.id);
+                                if (!isNaN(siteId)) {
+                                    initializeFromCachedSite(siteId);
+                                } else {
+                                    alert('サイトIDが無効です');
+                                }
+                            });
+                            
+                            siteItem.appendChild(siteInfo);
+                            siteItem.appendChild(selectBtn);
+                            
+                            cachedSitesList.appendChild(siteItem);
+                        });
+                    })
+                    .catch(error => {
+                        cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">エラー: サイト一覧を取得できません</div>';
+                    });
+            }
+            
+            // キャッシュされたサイトから初期化
+            function initializeFromCachedSite(siteId) {
+                // ボタンを無効化し、ステータスを更新
+                initializeBtn.disabled = true;
+                statusElement.textContent = '初期化中...キャッシュからサイト情報を読み込んでいます';
+                
+                // APIにリクエストを送信
+                fetch(`${API_BASE_URL}/initialize/cached/${siteId}`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('初期化に失敗しました');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 成功時の処理
+                    statusElement.textContent = data.answer;
+                    
+                    // キャッシュ情報を更新
+                    loadCacheStats();
+                    
+                    // キャッシュ状態に応じたメッセージを表示
+                    let message = `${data.pages_scraped}ページの情報を取得しました。`;
+                    message += ` <span class="cache-badge cache-hit">キャッシュから読み込み</span>`;
+                    message += " 質問してください。";
+                    
+                    addMessage(message, 'bot', true);
+                    
+                    // チャット入力を有効化
+                    messageInput.disabled = false;
+                    sendBtn.disabled = false;
+                    messageInput.focus();
+                    
+                    // キャッシュサイト一覧を非表示
+                    cachedSitesContainer.classList.remove('visible');
+                })
+                .catch(error => {
+                    // エラー時の処理
+                    statusElement.textContent = error.message;
+                    initializeBtn.disabled = false;
+                });
+            }
+            
+            // 期限切れキャッシュを削除
+            clearCache.addEventListener('click', function() {
+                fetch(`${API_BASE_URL}/cache/clear`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(`${data.deleted_count}件の期限切れキャッシュを削除しました`);
+                        loadCacheStats();
+                        loadCachedSites();
+                    })
+                    .catch(error => {
+                        alert('キャッシュの削除に失敗しました');
+                    });
+            });
+            
+            // キャッシュ済みサイトの表示/非表示
+            showCachedSites.addEventListener('click', function() {
+                if (cachedSitesContainer.classList.contains('visible')) {
+                    cachedSitesContainer.classList.remove('visible');
+                } else {
+                    cachedSitesContainer.classList.add('visible');
+                    loadCachedSites();
+                }
+            });
+            
+            // キャッシュチェックボックスの変更時の処理
+            useCache.addEventListener('change', function() {
+                loadCacheStats();
+                forceRefresh.disabled = !this.checked;
+            });
+            
             // 詳細設定の表示/非表示を切り替え
             toggleAdvanced.addEventListener('click', function() {
                 advancedOptions.classList.toggle('visible');
@@ -261,18 +547,16 @@
             // サブページチェックボックスの変更時の処理
             includeSubpages.addEventListener('change', function() {
                 if (this.checked) {
-                    advancedOptions.style.opacity = '1';
                     maxPages.disabled = false;
                     maxDepth.disabled = false;
                 } else {
-                    advancedOptions.style.opacity = '0.5';
                     maxPages.disabled = true;
                     maxDepth.disabled = true;
                 }
             });
             
-            // APIのベースURL（必要に応じて変更）
-            const API_BASE_URL = 'http://localhost:8000';
+            // 初期化時にキャッシュ統計を読み込む
+            loadCacheStats();
             
             // チャットボットの初期化
             initializeBtn.addEventListener('click', function() {
@@ -296,7 +580,9 @@
                         url: url,
                         include_subpages: includeSubpages.checked,
                         max_pages: parseInt(maxPages.value),
-                        max_depth: parseInt(maxDepth.value)
+                        max_depth: parseInt(maxDepth.value),
+                        use_cache: useCache.checked,
+                        force_refresh: forceRefresh.checked
                     })
                 })
                 .then(response => {
@@ -309,10 +595,19 @@
                     // 成功時の処理
                     statusElement.textContent = data.answer;
                     
-                    // 取得したページ数を表示
-                    if (data.pages_scraped > 0) {
-                        addMessage(`${data.pages_scraped}ページの情報を取得しました。質問してください。`, 'bot');
+                    // キャッシュ情報を更新
+                    loadCacheStats();
+                    
+                    // キャッシュ状態に応じたメッセージを表示
+                    let message = `${data.pages_scraped}ページの情報を取得しました。`;
+                    if (useCache.checked) {
+                        const cacheStatus = data.from_cache ? 'キャッシュから読み込み' : '新規取得';
+                        const badgeClass = data.from_cache ? 'cache-hit' : 'cache-miss';
+                        message += ` <span class="cache-badge ${badgeClass}">${cacheStatus}</span>`;
                     }
+                    message += " 質問してください。";
+                    
+                    addMessage(message, 'bot', true);
                     
                     // チャット入力を有効化
                     messageInput.disabled = false;
@@ -385,7 +680,7 @@
             });
             
             // メッセージの追加
-            function addMessage(message, sender) {
+            function addMessage(message, sender, allowHTML = false) {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message');
                 messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
@@ -397,7 +692,15 @@
                     // ボットのメッセージはマークダウンとして解析
                     const markdownDiv = document.createElement('div');
                     markdownDiv.classList.add('markdown-content');
-                    markdownDiv.innerHTML = marked.parse(message);
+                    
+                    if (allowHTML) {
+                        // HTMLを直接許可する場合（キャッシュバッジなど）
+                        markdownDiv.innerHTML = message;
+                    } else {
+                        // マークダウンとして解析
+                        markdownDiv.innerHTML = marked.parse(message);
+                    }
+                    
                     messageElement.appendChild(markdownDiv);
                     
                     // コードブロックにシンタックスハイライトを適用
