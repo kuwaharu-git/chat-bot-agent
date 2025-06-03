@@ -20,27 +20,31 @@ class GeminiChatbot:
         # チャットインスタンス
         self.chat = None
         
-    def initialize_with_url(self, url=None, include_subpages=True):
+    def initialize_with_url(self, url=None, include_subpages=True, max_pages=10, max_depth=2):
         """指定されたURLからコンテンツを取得してチャットボットを初期化する"""
         # ウェブサイトからコンテンツを取得
         print(f"ウェブサイト {url} からコンテンツを取得しています...")
         
         if include_subpages:
             # サブページも含めて取得
-            print("サブページも含めてスクレイピングします...")
-            scraped_data = self.scraper.scrape_with_subpages(url, max_pages=3)
+            print(f"サブページも含めてスクレイピングします（最大{max_pages}ページ、深さ{max_depth}まで）...")
+            scraped_data = self.scraper.scrape_with_subpages(url, max_pages=max_pages, max_depth=max_depth)
+            pages_count = len(self.scraper.visited_urls)
+            print(f"合計 {pages_count} ページの情報を取得しました。")
         else:
             # メインページのみ取得
             scraped_data = self.scraper.scrape(url)
+            pages_count = 1
         
         if not scraped_data:
-            return False
+            return False, "ウェブサイトからの情報取得に失敗しました。"
             
         # システムプロンプトを作成
         system_prompt = f"""
 あなたは次のウェブページの内容に基づいて質問に答えるアシスタントです。
 ウェブページのタイトル: {scraped_data['title']}
 ウェブページのURL: {scraped_data['url']}
+取得したページ数: {pages_count}
 
 ウェブページの内容を以下に示します:
 {scraped_data['content']}
@@ -60,7 +64,7 @@ class GeminiChatbot:
         # 会話履歴をクリア
         self.chat_history = []
         
-        return True
+        return True, f"{pages_count}ページの情報を取得しました。チャットボットの準備ができました。"
     
     def ask(self, question):
         """質問を受け取り、回答を返す"""
@@ -100,8 +104,25 @@ if __name__ == "__main__":
     print("サブページも含めてスクレイピングしますか？ (y/n): ")
     include_subpages = input().lower() == 'y'
     
-    if chatbot.initialize_with_url(url, include_subpages):
-        print("チャットボットの準備ができました。質問を入力してください（終了するには 'exit' と入力）")
+    max_pages = 10
+    max_depth = 2
+    
+    if include_subpages:
+        print("取得する最大ページ数を入力してください（デフォルト: 10）: ")
+        max_pages_input = input()
+        if max_pages_input.isdigit():
+            max_pages = int(max_pages_input)
+            
+        print("探索する最大深さを入力してください（デフォルト: 2）: ")
+        max_depth_input = input()
+        if max_depth_input.isdigit():
+            max_depth = int(max_depth_input)
+    
+    success, message = chatbot.initialize_with_url(url, include_subpages, max_pages, max_depth)
+    
+    if success:
+        print(message)
+        print("質問を入力してください（終了するには 'exit' と入力）")
         
         while True:
             question = input("\nあなた: ")

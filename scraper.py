@@ -4,6 +4,7 @@ import html2text
 from config import TARGET_WEBSITE_URL
 import time
 import re
+from urllib.parse import urljoin, urlparse
 
 class WebScraper:
     def __init__(self, url=None):
@@ -12,6 +13,7 @@ class WebScraper:
         self.converter.ignore_links = False
         self.converter.ignore_images = True
         self.converter.body_width = 0  # 行の折り返しを無効化
+        self.visited_urls = set()  # 訪問済みURLを記録
         
     def fetch_content(self, url=None):
         """指定されたURLからウェブページの内容を取得する"""
@@ -132,6 +134,30 @@ class WebScraper:
             "url": self.url
         }
     
+    def is_valid_url(self, url, base_url):
+        """URLが有効かどうかを判断する"""
+        # 完全なURLに変換
+        full_url = urljoin(base_url, url)
+        
+        # URLのパース
+        parsed = urlparse(full_url)
+        
+        # 同じドメインかどうか確認
+        base_domain = urlparse(base_url).netloc
+        url_domain = parsed.netloc
+        
+        # 画像、PDF、CSSなどのリソースは除外
+        excluded_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.css', '.js', '.ico', '.svg', '.xml', '.json']
+        
+        # 条件チェック
+        is_same_domain = url_domain == base_domain
+        is_not_resource = not any(full_url.lower().endswith(ext) for ext in excluded_extensions)
+        is_not_anchor = not (parsed.path == '' and parsed.fragment != '')
+        is_not_mailto = not full_url.startswith('mailto:')
+        is_not_tel = not full_url.startswith('tel:')
+        
+        return is_same_domain and is_not_resource and is_not_anchor and is_not_mailto and is_not_tel
+    
     def scrape(self, url=None):
         """ウェブページをスクレイピングして情報を返す"""
         target_url = url or self.url
@@ -139,64 +165,94 @@ class WebScraper:
         html_content = self.fetch_content(target_url)
         return self.parse_html(html_content)
     
-    def scrape_with_subpages(self, url=None, max_pages=3):
+    def extract_links(self, html_content, base_url):
+        """HTMLからリンクを抽出する"""
+        if not html_content:
+            return []
+        
+        soup = BeautifulSoup(html_content, 'html.parser')
+        links = []
+        
+        # aタグからリンクを抽出
+        for a_tag in soup.find_all('a', href=True):
+            href = a_tag['href']
+            if self.is_valid_url(href, base_url):
+                full_url = urljoin(base_url, href)
+                links.append(full_url)
+        
+        # 重複を削除
+        return list(set(links))
+    
+    def scrape_with_subpages(self, url=None, max_pages=10, max_depth=2):
         """メインページとサブページをスクレイピングする"""
         target_url = url or self.url
+        self.visited_urls = set()  # 訪問済みURLをリセット
+        
+        print(f"メインページをスクレイピング: {target_url}")
         main_data = self.scrape(target_url)
+        self.visited_urls.add(target_url)
         
         if not main_data:
             return None
         
-        # メインページからリンクを抽出
-        try:
-            html_content = self.fetch_content(target_url)
-            if html_content:
-                soup = BeautifulSoup(html_content, 'html.parser')
-                base_url = '/'.join(target_url.split('/')[:3])  # http(s)://domain.com
-                
-                # 同じドメインの内部リンクを収集
-                internal_links = []
-                for a_tag in soup.find_all('a', href=True):
-                    href = a_tag['href']
-                    if href.startswith('/') or target_url in href:
-                        if href.startswith('/'):
-                            full_url = base_url + href
-                        else:
-                            full_url = href
-                        
-                        # 画像、PDF、CSSなどのリソースは除外
-                        if not any(ext in full_url for ext in ['.jpg', '.png', '.gif', '.pdf', '.css', '.js']):
-                            internal_links.append(full_url)
-                
-                # 重複を削除
-                internal_links = list(set(internal_links))
-                
-                # 最大ページ数まで制限
-                internal_links = internal_links[:max_pages]
-                
-                # サブページの内容を取得
-                all_content = main_data['content']
-                
-                for link in internal_links:
-                    print(f"サブページをスクレイピング中: {link}")
-                    sub_data = self.scrape(link)
-                    if sub_data:
-                        all_content += f"\n\n--- サブページ: {sub_data['title']} ({link}) ---\n"
-                        all_content += sub_data['content']
-                    
-                    # 連続リクエストによるブロックを避けるため短い待機時間を設ける
-                    time.sleep(1)
-                
-                main_data['content'] = all_content
-        except Exception as e:
-            print(f"サブページのスクレイピング中にエラーが発生しました: {e}")
+        all_content = main_data['content']
         
+        # 幅優先探索でサブページを探索
+        queue = [(target_url, 0)]  # (URL, 深さ)
+        index = 0
+        
+        while index < len(queue) and len(self.visited_urls) < max_pages:
+            current_url, depth = queue[index]
+            index += 1
+            
+            # 最大深さに達したら探索を停止
+            if depth >= max_depth:
+                continue
+            
+            # 現在のページからリンクを抽出
+            if current_url not in self.visited_urls:
+                continue
+                
+            html_content = self.fetch_content(current_url)
+            if not html_content:
+                continue
+                
+            links = self.extract_links(html_content, current_url)
+            
+            # 各リンクを処理
+            for link in links:
+                # 既に訪問済みならスキップ
+                if link in self.visited_urls:
+                    continue
+                    
+                # 最大ページ数に達したら終了
+                if len(self.visited_urls) >= max_pages:
+                    break
+                
+                print(f"サブページをスクレイピング中 ({len(self.visited_urls)}/{max_pages}): {link}")
+                sub_data = self.scrape(link)
+                self.visited_urls.add(link)
+                
+                if sub_data:
+                    all_content += f"\n\n--- サブページ: {sub_data['title']} ({link}) ---\n"
+                    all_content += sub_data['content']
+                
+                # 次の深さのリンクをキューに追加
+                queue.append((link, depth + 1))
+                
+                # 連続リクエストによるブロックを避けるため短い待機時間を設ける
+                time.sleep(0.5)
+        
+        main_data['content'] = all_content
+        print(f"合計 {len(self.visited_urls)} ページをスクレイピングしました")
         return main_data
 
 # 使用例
 if __name__ == "__main__":
     scraper = WebScraper()
-    data = scraper.scrape()
+    url = input("スクレイピングするURLを入力してください: ")
+    data = scraper.scrape_with_subpages(url, max_pages=10, max_depth=2)
     if data:
         print(f"タイトル: {data['title']}")
+        print(f"取得したページ数: {len(scraper.visited_urls)}")
         print(f"コンテンツ（一部）: {data['content'][:200]}...") 

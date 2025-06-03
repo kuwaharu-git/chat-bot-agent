@@ -46,8 +46,40 @@
             align-items: center;
             margin-bottom: 10px;
         }
-        .subpage-option input {
+        .subpage-option input[type="checkbox"] {
             margin-right: 8px;
+        }
+        .advanced-options {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .advanced-options.visible {
+            display: block;
+        }
+        .option-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .option-row label {
+            width: 150px;
+        }
+        .option-row input[type="number"] {
+            width: 60px;
+            padding: 5px;
+        }
+        .toggle-advanced {
+            background: none;
+            border: none;
+            color: #2196F3;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+            margin-top: 5px;
+            font-size: 14px;
         }
         .chat-container {
             border: 1px solid #ddd;
@@ -113,6 +145,19 @@
             <input type="checkbox" id="include-subpages" checked>
             <label for="include-subpages">サブページも含めてスクレイピングする（より多くの情報を取得できますが、時間がかかります）</label>
         </div>
+        <button class="toggle-advanced" id="toggle-advanced">詳細設定を表示</button>
+        <div class="advanced-options" id="advanced-options">
+            <div class="option-row">
+                <label for="max-pages">最大ページ数:</label>
+                <input type="number" id="max-pages" value="10" min="1" max="50">
+                <span>（多いほど情報量が増えますが、時間がかかります）</span>
+            </div>
+            <div class="option-row">
+                <label for="max-depth">最大探索深さ:</label>
+                <input type="number" id="max-depth" value="2" min="1" max="5">
+                <span>（深いほど広範囲の情報を取得できますが、関連性が薄くなる可能性があります）</span>
+            </div>
+        </div>
     </div>
     
     <div class="chat-container" id="chat-container">
@@ -129,11 +174,35 @@
         document.addEventListener('DOMContentLoaded', function() {
             const urlInput = document.getElementById('url-input');
             const includeSubpages = document.getElementById('include-subpages');
+            const maxPages = document.getElementById('max-pages');
+            const maxDepth = document.getElementById('max-depth');
+            const toggleAdvanced = document.getElementById('toggle-advanced');
+            const advancedOptions = document.getElementById('advanced-options');
             const initializeBtn = document.getElementById('initialize-btn');
             const messageInput = document.getElementById('message-input');
             const sendBtn = document.getElementById('send-btn');
             const chatContainer = document.getElementById('chat-container');
             const statusElement = document.getElementById('status');
+            
+            // 詳細設定の表示/非表示を切り替え
+            toggleAdvanced.addEventListener('click', function() {
+                advancedOptions.classList.toggle('visible');
+                toggleAdvanced.textContent = advancedOptions.classList.contains('visible') ? 
+                    '詳細設定を隠す' : '詳細設定を表示';
+            });
+            
+            // サブページチェックボックスの変更時の処理
+            includeSubpages.addEventListener('change', function() {
+                if (this.checked) {
+                    advancedOptions.style.opacity = '1';
+                    maxPages.disabled = false;
+                    maxDepth.disabled = false;
+                } else {
+                    advancedOptions.style.opacity = '0.5';
+                    maxPages.disabled = true;
+                    maxDepth.disabled = true;
+                }
+            });
             
             // APIのベースURL（必要に応じて変更）
             const API_BASE_URL = 'http://localhost:8000';
@@ -158,7 +227,9 @@
                     },
                     body: JSON.stringify({ 
                         url: url,
-                        include_subpages: includeSubpages.checked
+                        include_subpages: includeSubpages.checked,
+                        max_pages: parseInt(maxPages.value),
+                        max_depth: parseInt(maxDepth.value)
                     })
                 })
                 .then(response => {
@@ -170,6 +241,11 @@
                 .then(data => {
                     // 成功時の処理
                     statusElement.textContent = data.answer;
+                    
+                    // 取得したページ数を表示
+                    if (data.pages_scraped > 0) {
+                        addMessage(`${data.pages_scraped}ページの情報を取得しました。質問してください。`, 'bot');
+                    }
                     
                     // チャット入力を有効化
                     messageInput.disabled = false;
