@@ -79,12 +79,17 @@ python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 ### ウェブインターフェース
 
-1. サーバーを起動した後、ブラウザで`simple_frontend.html`ファイルを開きます
-2. URLを入力するか、キャッシュされたサイトを選択してチャットボットを初期化します
-3. 質問を入力して回答を取得します
+1. サーバーを起動します：
+```bash
+python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+2. ブラウザで `http://localhost:8000` にアクセスします
+3. URLを入力するか、キャッシュされたサイトを選択してチャットボットを初期化します
+4. 質問を入力して回答を取得します
 
 ## APIエンドポイント
 
+- `GET /` - ウェブインターフェースを表示
 - `POST /initialize` - チャットボットを特定のURLで初期化
 - `POST /ask` - 質問を送信して回答を取得
 - `GET /history` - チャット履歴を取得

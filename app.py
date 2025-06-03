@@ -5,6 +5,9 @@ from chatbot import GeminiChatbot
 from config import API_HOST, API_PORT
 import uvicorn
 from db_manager import DBManager
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 app = FastAPI(title="ウェブサイト情報チャットボットAPI")
 
@@ -53,6 +56,11 @@ class CachedSiteInfo(BaseModel):
     title: str
     last_scraped: str
     pages_count: int
+
+@app.get("/")
+async def get_index():
+    """ルートパスでフロントエンドを提供する"""
+    return FileResponse("simple_frontend.html")
 
 @app.post("/initialize", response_model=ChatResponse)
 async def initialize_chatbot(request: URLRequest = Body(...)):

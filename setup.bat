@@ -50,6 +50,6 @@ echo 1. .envファイルにGemini APIキーを設定してください。
 echo 2. 仮想環境を有効化するには、次のコマンドを実行してください: venv\Scripts\activate
 echo 3. コマンドラインインターフェースを使用するには: python chatbot.py
 echo 4. Web APIを起動するには: python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-echo 5. ウェブインターフェースにアクセスするには: ブラウザでsimple_frontend.htmlを開いてください
+echo 5. ウェブインターフェースにアクセスするには: ブラウザで http://localhost:8000 にアクセスしてください
 
 endlocal 
