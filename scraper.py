@@ -5,15 +5,21 @@ from config import TARGET_WEBSITE_URL
 import time
 import re
 from urllib.parse import urljoin, urlparse
+from db_manager import DBManager
 
 class WebScraper:
-    def __init__(self, url=None):
+    def __init__(self, url=None, use_cache=True, cache_expire_days=7):
         self.url = url or TARGET_WEBSITE_URL
         self.converter = html2text.HTML2Text()
         self.converter.ignore_links = False
         self.converter.ignore_images = True
         self.converter.body_width = 0  # 行の折り返しを無効化
         self.visited_urls = set()  # 訪問済みURLを記録
+        
+        # キャッシュ設定
+        self.use_cache = use_cache
+        self.cache_expire_days = cache_expire_days
+        self.db_manager = DBManager() if use_cache else None
         
     def fetch_content(self, url=None):
         """指定されたURLからウェブページの内容を取得する"""
@@ -162,6 +168,19 @@ class WebScraper:
         """ウェブページをスクレイピングして情報を返す"""
         target_url = url or self.url
         self.url = target_url  # URLを更新
+        
+        # キャッシュを使用する場合、キャッシュをチェック
+        if self.use_cache and self.db_manager:
+            cached_data = self.db_manager.get_scraped_data(target_url)
+            if cached_data:
+                print(f"キャッシュからデータを読み込みました: {target_url}")
+                return {
+                    "title": cached_data["title"],
+                    "content": cached_data["content"],
+                    "url": cached_data["url"]
+                }
+        
+        # キャッシュにない場合は新たに取得
         html_content = self.fetch_content(target_url)
         return self.parse_html(html_content)
     
@@ -186,6 +205,20 @@ class WebScraper:
     def scrape_with_subpages(self, url=None, max_pages=10, max_depth=2):
         """メインページとサブページをスクレイピングする"""
         target_url = url or self.url
+        
+        # キャッシュを使用する場合、キャッシュをチェック
+        if self.use_cache and self.db_manager:
+            cached_data = self.db_manager.get_scraped_data(target_url)
+            if cached_data:
+                print(f"キャッシュからデータを読み込みました: {target_url} ({cached_data['pages_count']}ページ)")
+                self.visited_urls = set(cached_data["visited_urls"])
+                return {
+                    "title": cached_data["title"],
+                    "content": cached_data["content"],
+                    "url": cached_data["url"]
+                }
+        
+        # キャッシュにない場合は新たに取得
         self.visited_urls = set()  # 訪問済みURLをリセット
         
         print(f"メインページをスクレイピング: {target_url}")
@@ -245,11 +278,23 @@ class WebScraper:
         
         main_data['content'] = all_content
         print(f"合計 {len(self.visited_urls)} ページをスクレイピングしました")
+        
+        # キャッシュに保存
+        if self.use_cache and self.db_manager:
+            self.db_manager.save_scraped_data(
+                target_url,
+                main_data['title'],
+                main_data['content'],
+                list(self.visited_urls),
+                self.cache_expire_days
+            )
+            print(f"データをキャッシュに保存しました: {target_url}")
+        
         return main_data
 
 # 使用例
 if __name__ == "__main__":
-    scraper = WebScraper()
+    scraper = WebScraper(use_cache=True)
     url = input("スクレイピングするURLを入力してください: ")
     data = scraper.scrape_with_subpages(url, max_pages=10, max_depth=2)
     if data:
