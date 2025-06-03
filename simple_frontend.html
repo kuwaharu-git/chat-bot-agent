@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ウェブサイト情報チャットボット</title>
+    <!-- マークダウンをHTMLに変換するためのライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+    <!-- シンタックスハイライト用のライブラリ -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/highlight.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -100,6 +105,7 @@
         }
         .bot-message {
             background-color: #e3f2fd;
+            text-align: left;
         }
         .chat-form {
             display: flex;
@@ -128,6 +134,54 @@
         button:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
+        }
+        
+        /* マークダウン内のスタイル */
+        .markdown-content {
+            line-height: 1.6;
+        }
+        .markdown-content h1, 
+        .markdown-content h2, 
+        .markdown-content h3, 
+        .markdown-content h4 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+        .markdown-content ul, 
+        .markdown-content ol {
+            padding-left: 20px;
+        }
+        .markdown-content pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .markdown-content code {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+        .markdown-content th, 
+        .markdown-content td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .markdown-content th {
+            background-color: #f2f2f2;
+        }
+        .markdown-content blockquote {
+            border-left: 4px solid #ddd;
+            padding-left: 10px;
+            margin-left: 0;
+            color: #666;
         }
     </style>
 </head>
@@ -183,6 +237,19 @@
             const sendBtn = document.getElementById('send-btn');
             const chatContainer = document.getElementById('chat-container');
             const statusElement = document.getElementById('status');
+            
+            // マークダウンのオプション設定
+            marked.setOptions({
+                breaks: true,  // 改行を有効にする
+                gfm: true,     // GitHub Flavored Markdownを有効にする
+                highlight: function(code, lang) {
+                    // シンタックスハイライトを適用
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return hljs.highlightAuto(code).value;
+                }
+            });
             
             // 詳細設定の表示/非表示を切り替え
             toggleAdvanced.addEventListener('click', function() {
@@ -322,7 +389,22 @@
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message');
                 messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
-                messageElement.textContent = message;
+                
+                if (sender === 'user') {
+                    // ユーザーメッセージはプレーンテキスト
+                    messageElement.textContent = message;
+                } else {
+                    // ボットのメッセージはマークダウンとして解析
+                    const markdownDiv = document.createElement('div');
+                    markdownDiv.classList.add('markdown-content');
+                    markdownDiv.innerHTML = marked.parse(message);
+                    messageElement.appendChild(markdownDiv);
+                    
+                    // コードブロックにシンタックスハイライトを適用
+                    messageElement.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                }
                 
                 chatContainer.appendChild(messageElement);
                 
