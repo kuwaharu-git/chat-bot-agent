@@ -43,4 +43,9 @@ ehthumbs.db
 Thumbs.db
 
 # ログ
-*.log 
+*.log
+
+# SQLiteデータベース
+*.db
+*.sqlite
+*.sqlite3 
