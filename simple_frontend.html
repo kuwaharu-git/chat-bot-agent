@@ -346,10 +346,15 @@
                     gfm: true,     // GitHub Flavored Markdownを有効にする
                     highlight: function(code, lang) {
                         // シンタックスハイライトを適用
-                        if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
-                            return hljs.highlight(code, { language: lang }).value;
+                        try {
+                            if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                                return hljs.highlight(code, { language: lang }).value;
+                            }
+                            return code;
+                        } catch (e) {
+                            console.warn('ハイライト処理中にエラーが発生しました:', e);
+                            return code;
                         }
-                        return code;
                     }
                 });
             } else {
@@ -703,9 +708,14 @@
                         markdownDiv.innerHTML = message;
                     } else {
                         // マークダウンとして解析
-                        if (typeof marked !== 'undefined') {
-                            markdownDiv.innerHTML = marked.parse(message);
-                        } else {
+                        try {
+                            if (typeof marked !== 'undefined') {
+                                markdownDiv.innerHTML = marked.parse(message);
+                            } else {
+                                markdownDiv.textContent = message;
+                            }
+                        } catch (e) {
+                            console.warn('マークダウン変換中にエラーが発生しました:', e);
                             markdownDiv.textContent = message;
                         }
                     }
@@ -713,10 +723,18 @@
                     messageElement.appendChild(markdownDiv);
                     
                     // コードブロックにシンタックスハイライトを適用
-                    if (typeof hljs !== 'undefined') {
-                        messageElement.querySelectorAll('pre code').forEach((block) => {
-                            hljs.highlightElement(block);
-                        });
+                    try {
+                        if (typeof hljs !== 'undefined') {
+                            messageElement.querySelectorAll('pre code').forEach((block) => {
+                                try {
+                                    hljs.highlightElement(block);
+                                } catch (e) {
+                                    console.warn('コードブロックのハイライト中にエラーが発生しました:', e);
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('ハイライト処理中にエラーが発生しました:', e);
                     }
                 }
                 
