@@ -356,383 +356,388 @@
                 console.error('marked ライブラリがロードされていません');
             }
             
-            // DOMが読み込まれたら実行
-            document.addEventListener('DOMContentLoaded', function() {
-                const urlInput = document.getElementById('url-input');
-                const includeSubpages = document.getElementById('include-subpages');
-                const maxPages = document.getElementById('max-pages');
-                const maxDepth = document.getElementById('max-depth');
-                const useCache = document.getElementById('use-cache');
-                const forceRefresh = document.getElementById('force-refresh');
-                const toggleAdvanced = document.getElementById('toggle-advanced');
-                const advancedOptions = document.getElementById('advanced-options');
-                const initializeBtn = document.getElementById('initialize-btn');
-                const messageInput = document.getElementById('message-input');
-                const sendBtn = document.getElementById('send-btn');
-                const chatContainer = document.getElementById('chat-container');
-                const statusElement = document.getElementById('status');
-                const cacheInfo = document.getElementById('cache-info');
-                const cacheStats = document.getElementById('cache-stats');
-                const clearCache = document.getElementById('clear-cache');
-                const showCachedSites = document.getElementById('show-cached-sites');
-                const cachedSitesContainer = document.getElementById('cached-sites-container');
-                const cachedSitesList = document.getElementById('cached-sites-list');
-                
-                // APIのベースURL（必要に応じて変更）
-                const API_BASE_URL = 'http://localhost:8000';
-                
-                // キャッシュ統計情報を取得
-                function loadCacheStats() {
-                    if (useCache.checked) {
-                        cacheInfo.style.display = 'block';
-                        
-                        fetch(`${API_BASE_URL}/cache/stats`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.sites_count > 0) {
-                                    cacheStats.textContent = `${data.sites_count}サイト, ${data.urls_count}URL, ${Math.round(data.db_size_kb)}KB`;
-                                } else {
-                                    cacheStats.textContent = 'キャッシュなし';
-                                }
-                            })
-                            .catch(error => {
-                                cacheStats.textContent = 'エラー: 統計情報を取得できません';
-                            });
-                    } else {
-                        cacheInfo.style.display = 'none';
-                    }
-                }
-                
-                // キャッシュ済みサイト一覧を読み込む
-                function loadCachedSites() {
-                    cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">読み込み中...</div>';
+            // DOM要素の取得
+            const urlInput = document.getElementById('url-input');
+            const includeSubpages = document.getElementById('include-subpages');
+            const maxPages = document.getElementById('max-pages');
+            const maxDepth = document.getElementById('max-depth');
+            const useCache = document.getElementById('use-cache');
+            const forceRefresh = document.getElementById('force-refresh');
+            const toggleAdvanced = document.getElementById('toggle-advanced');
+            const advancedOptions = document.getElementById('advanced-options');
+            const initializeBtn = document.getElementById('initialize-btn');
+            const messageInput = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+            const chatContainer = document.getElementById('chat-container');
+            const statusElement = document.getElementById('status');
+            const cacheInfo = document.getElementById('cache-info');
+            const cacheStats = document.getElementById('cache-stats');
+            const clearCache = document.getElementById('clear-cache');
+            const showCachedSites = document.getElementById('show-cached-sites');
+            const cachedSitesContainer = document.getElementById('cached-sites-container');
+            const cachedSitesList = document.getElementById('cached-sites-list');
+            
+            // APIのベースURL（必要に応じて変更）
+            const API_BASE_URL = 'http://localhost:8000';
+            
+            // キャッシュ統計情報を取得
+            function loadCacheStats() {
+                if (useCache.checked) {
+                    cacheInfo.style.display = 'block';
                     
-                    fetch(`${API_BASE_URL}/cache/sites`)
-                        .then(response => response.json())
-                        .then(sites => {
-                            cachedSitesList.innerHTML = '';
-                            
-                            if (sites.length === 0) {
-                                cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">キャッシュされたサイトはありません</div>';
-                                return;
-                            }
-                            
-                            sites.forEach(site => {
-                                const siteItem = document.createElement('div');
-                                siteItem.className = 'cached-site-item';
-                                
-                                const siteInfo = document.createElement('div');
-                                
-                                const siteTitle = document.createElement('div');
-                                siteTitle.className = 'site-title';
-                                siteTitle.textContent = site.title || 'タイトルなし';
-                                
-                                const siteUrl = document.createElement('div');
-                                siteUrl.className = 'site-url';
-                                siteUrl.textContent = site.url;
-                                
-                                const siteMeta = document.createElement('div');
-                                siteMeta.className = 'site-meta';
-                                
-                                // 日時をフォーマット
-                                const date = new Date(site.last_scraped);
-                                const formattedDate = `${date.getFullYear()}/${(date.getMonth()+1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                                
-                                siteMeta.textContent = `${site.pages_count}ページ・${formattedDate}取得`;
-                                
-                                siteInfo.appendChild(siteTitle);
-                                siteInfo.appendChild(siteUrl);
-                                siteInfo.appendChild(siteMeta);
-                                
-                                const selectBtn = document.createElement('button');
-                                selectBtn.className = 'site-select-btn';
-                                selectBtn.textContent = '選択';
-                                selectBtn.addEventListener('click', function() {
-                                    // サイトIDが必ず数値であることを確認
-                                    const siteId = parseInt(site.id);
-                                    if (!isNaN(siteId)) {
-                                        initializeFromCachedSite(siteId);
-                                    } else {
-                                        alert('サイトIDが無効です');
-                                    }
-                                });
-                                
-                                siteItem.appendChild(siteInfo);
-                                siteItem.appendChild(selectBtn);
-                                
-                                cachedSitesList.appendChild(siteItem);
-                            });
-                        })
-                        .catch(error => {
-                            cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">エラー: サイト一覧を取得できません</div>';
-                        });
-                }
-                
-                // キャッシュされたサイトから初期化
-                function initializeFromCachedSite(siteId) {
-                    // ボタンを無効化し、ステータスを更新
-                    initializeBtn.disabled = true;
-                    statusElement.textContent = '初期化中...キャッシュからサイト情報を読み込んでいます';
-                    
-                    // APIにリクエストを送信
-                    fetch(`${API_BASE_URL}/initialize/cached/${siteId}`, {
-                        method: 'POST'
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('初期化に失敗しました');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // 成功時の処理
-                        statusElement.textContent = data.answer;
-                        
-                        // キャッシュ情報を更新
-                        loadCacheStats();
-                        
-                        // キャッシュ状態に応じたメッセージを表示
-                        let message = `${data.pages_scraped}ページの情報を取得しました。`;
-                        message += ` <span class="cache-badge cache-hit">キャッシュから読み込み</span>`;
-                        message += " 質問してください。";
-                        
-                        addMessage(message, 'bot', true);
-                        
-                        // チャット入力を有効化
-                        messageInput.disabled = false;
-                        sendBtn.disabled = false;
-                        messageInput.focus();
-                        
-                        // キャッシュサイト一覧を非表示
-                        cachedSitesContainer.classList.remove('visible');
-                    })
-                    .catch(error => {
-                        // エラー時の処理
-                        statusElement.textContent = error.message;
-                        initializeBtn.disabled = false;
-                    });
-                }
-                
-                // 期限切れキャッシュを削除
-                clearCache.addEventListener('click', function() {
-                    fetch(`${API_BASE_URL}/cache/clear`, { method: 'POST' })
+                    fetch(`${API_BASE_URL}/cache/stats`)
                         .then(response => response.json())
                         .then(data => {
-                            alert(`${data.deleted_count}件の期限切れキャッシュを削除しました`);
-                            loadCacheStats();
-                            loadCachedSites();
+                            if (data.sites_count > 0) {
+                                cacheStats.textContent = `${data.sites_count}サイト, ${data.urls_count}URL, ${Math.round(data.db_size_kb)}KB`;
+                            } else {
+                                cacheStats.textContent = 'キャッシュなし';
+                            }
                         })
                         .catch(error => {
-                            alert('キャッシュの削除に失敗しました');
+                            cacheStats.textContent = 'エラー: 統計情報を取得できません';
                         });
-                });
-                
-                // キャッシュ済みサイトの表示/非表示
-                showCachedSites.addEventListener('click', function() {
-                    if (cachedSitesContainer.classList.contains('visible')) {
-                        cachedSitesContainer.classList.remove('visible');
-                    } else {
-                        cachedSitesContainer.classList.add('visible');
-                        loadCachedSites();
-                    }
-                });
-                
-                // キャッシュチェックボックスの変更時の処理
-                useCache.addEventListener('change', function() {
-                    loadCacheStats();
-                    forceRefresh.disabled = !this.checked;
-                });
-                
-                // 詳細設定の表示/非表示を切り替え
-                toggleAdvanced.addEventListener('click', function() {
-                    advancedOptions.classList.toggle('visible');
-                    toggleAdvanced.textContent = advancedOptions.classList.contains('visible') ? 
-                        '詳細設定を隠す' : '詳細設定を表示';
-                });
-                
-                // サブページチェックボックスの変更時の処理
-                includeSubpages.addEventListener('change', function() {
-                    if (this.checked) {
-                        maxPages.disabled = false;
-                        maxDepth.disabled = false;
-                    } else {
-                        maxPages.disabled = true;
-                        maxDepth.disabled = true;
-                    }
-                });
-                
-                // 初期化時にキャッシュ統計を読み込む
-                loadCacheStats();
-                
-                // チャットボットの初期化
-                initializeBtn.addEventListener('click', function() {
-                    const url = urlInput.value.trim();
-                    if (!url) {
-                        alert('URLを入力してください');
-                        return;
-                    }
-                    
-                    // ボタンを無効化し、ステータスを更新
-                    initializeBtn.disabled = true;
-                    statusElement.textContent = '初期化中...サイト情報を取得しています';
-                    
-                    // APIにリクエストを送信
-                    fetch(`${API_BASE_URL}/initialize`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            url: url,
-                            include_subpages: includeSubpages.checked,
-                            max_pages: parseInt(maxPages.value),
-                            max_depth: parseInt(maxDepth.value),
-                            use_cache: useCache.checked,
-                            force_refresh: forceRefresh.checked
-                        })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('初期化に失敗しました');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // 成功時の処理
-                        statusElement.textContent = data.answer;
-                        
-                        // キャッシュ情報を更新
-                        loadCacheStats();
-                        
-                        // キャッシュ状態に応じたメッセージを表示
-                        let message = `${data.pages_scraped}ページの情報を取得しました。`;
-                        if (useCache.checked) {
-                            const cacheStatus = data.from_cache ? 'キャッシュから読み込み' : '新規取得';
-                            const badgeClass = data.from_cache ? 'cache-hit' : 'cache-miss';
-                            message += ` <span class="cache-badge ${badgeClass}">${cacheStatus}</span>`;
-                        }
-                        message += " 質問してください。";
-                        
-                        addMessage(message, 'bot', true);
-                        
-                        // チャット入力を有効化
-                        messageInput.disabled = false;
-                        sendBtn.disabled = false;
-                        messageInput.focus();
-                    })
-                    .catch(error => {
-                        // エラー時の処理
-                        statusElement.textContent = error.message;
-                        initializeBtn.disabled = false;
-                    });
-                });
-                
-                // メッセージ送信
-                function sendMessage() {
-                    const message = messageInput.value.trim();
-                    if (!message) {
-                        return;
-                    }
-                    
-                    // ユーザーメッセージをチャット画面に追加
-                    addMessage(message, 'user');
-                    
-                    // 入力フィールドをクリア
-                    messageInput.value = '';
-                    
-                    // ボタンを無効化
-                    sendBtn.disabled = true;
-                    messageInput.disabled = true;
-                    
-                    // APIにリクエストを送信
-                    fetch(`${API_BASE_URL}/ask`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ question: message })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('質問の送信に失敗しました');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // ボットの回答をチャット画面に追加
-                        addMessage(data.answer, 'bot');
-                        
-                        // 入力を再度有効化
-                        sendBtn.disabled = false;
-                        messageInput.disabled = false;
-                        messageInput.focus();
-                    })
-                    .catch(error => {
-                        // エラー時の処理
-                        addMessage(`エラー: ${error.message}`, 'bot');
-                        sendBtn.disabled = false;
-                        messageInput.disabled = false;
-                    });
+                } else {
+                    cacheInfo.style.display = 'none';
                 }
+            }
+            
+            // キャッシュ済みサイト一覧を読み込む
+            function loadCachedSites() {
+                cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">読み込み中...</div>';
                 
-                // 送信ボタンのクリックイベント
-                sendBtn.addEventListener('click', sendMessage);
-                
-                // Enterキー押下時のイベント
-                messageInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        sendMessage();
-                    }
-                });
-                
-                // メッセージの追加
-                function addMessage(message, sender, allowHTML = false) {
-                    const messageElement = document.createElement('div');
-                    messageElement.classList.add('message');
-                    messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
-                    
-                    if (sender === 'user') {
-                        // ユーザーメッセージはプレーンテキスト
-                        messageElement.textContent = message;
-                    } else {
-                        // ボットのメッセージはマークダウンとして解析
-                        const markdownDiv = document.createElement('div');
-                        markdownDiv.classList.add('markdown-content');
+                fetch(`${API_BASE_URL}/cache/sites`)
+                    .then(response => response.json())
+                    .then(sites => {
+                        cachedSitesList.innerHTML = '';
                         
-                        if (allowHTML) {
-                            // HTMLを直接許可する場合（キャッシュバッジなど）
-                            markdownDiv.innerHTML = message;
-                        } else {
-                            // マークダウンとして解析
-                            if (typeof marked !== 'undefined') {
-                                markdownDiv.innerHTML = marked.parse(message);
-                            } else {
-                                markdownDiv.textContent = message;
-                            }
+                        if (sites.length === 0) {
+                            cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">キャッシュされたサイトはありません</div>';
+                            return;
                         }
                         
-                        messageElement.appendChild(markdownDiv);
-                        
-                        // コードブロックにシンタックスハイライトを適用
-                        if (typeof hljs !== 'undefined') {
-                            messageElement.querySelectorAll('pre code').forEach((block) => {
-                                hljs.highlightElement(block);
+                        sites.forEach(site => {
+                            const siteItem = document.createElement('div');
+                            siteItem.className = 'cached-site-item';
+                            
+                            const siteInfo = document.createElement('div');
+                            
+                            const siteTitle = document.createElement('div');
+                            siteTitle.className = 'site-title';
+                            siteTitle.textContent = site.title || 'タイトルなし';
+                            
+                            const siteUrl = document.createElement('div');
+                            siteUrl.className = 'site-url';
+                            siteUrl.textContent = site.url;
+                            
+                            const siteMeta = document.createElement('div');
+                            siteMeta.className = 'site-meta';
+                            
+                            // 日時をフォーマット
+                            const date = new Date(site.last_scraped);
+                            const formattedDate = `${date.getFullYear()}/${(date.getMonth()+1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                            
+                            siteMeta.textContent = `${site.pages_count}ページ・${formattedDate}取得`;
+                            
+                            siteInfo.appendChild(siteTitle);
+                            siteInfo.appendChild(siteUrl);
+                            siteInfo.appendChild(siteMeta);
+                            
+                            const selectBtn = document.createElement('button');
+                            selectBtn.className = 'site-select-btn';
+                            selectBtn.textContent = '選択';
+                            selectBtn.addEventListener('click', function() {
+                                // サイトIDが必ず数値であることを確認
+                                const siteId = parseInt(site.id);
+                                if (!isNaN(siteId)) {
+                                    initializeFromCachedSite(siteId);
+                                } else {
+                                    alert('サイトIDが無効です');
+                                }
                             });
-                        }
+                            
+                            siteItem.appendChild(siteInfo);
+                            siteItem.appendChild(selectBtn);
+                            
+                            cachedSitesList.appendChild(siteItem);
+                        });
+                    })
+                    .catch(error => {
+                        cachedSitesList.innerHTML = '<div style="text-align: center; padding: 10px;">エラー: サイト一覧を取得できません</div>';
+                    });
+            }
+            
+            // キャッシュされたサイトから初期化
+            function initializeFromCachedSite(siteId) {
+                // ボタンを無効化し、ステータスを更新
+                initializeBtn.disabled = true;
+                statusElement.textContent = '初期化中...キャッシュからサイト情報を読み込んでいます';
+                
+                // APIにリクエストを送信
+                fetch(`${API_BASE_URL}/initialize/cached/${siteId}`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('初期化に失敗しました');
                     }
+                    return response.json();
+                })
+                .then(data => {
+                    // 成功時の処理
+                    statusElement.textContent = data.answer;
                     
-                    chatContainer.appendChild(messageElement);
+                    // キャッシュ情報を更新
+                    loadCacheStats();
                     
-                    // 自動スクロール
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    // キャッシュ状態に応じたメッセージを表示
+                    let message = `${data.pages_scraped}ページの情報を取得しました。`;
+                    message += ` <span class="cache-badge cache-hit">キャッシュから読み込み</span>`;
+                    message += " 質問してください。";
+                    
+                    addMessage(message, 'bot', true);
+                    
+                    // チャット入力を有効化
+                    messageInput.disabled = false;
+                    sendBtn.disabled = false;
+                    messageInput.focus();
+                    
+                    // キャッシュサイト一覧を非表示
+                    cachedSitesContainer.classList.remove('visible');
+                })
+                .catch(error => {
+                    // エラー時の処理
+                    statusElement.textContent = error.message;
+                    initializeBtn.disabled = false;
+                });
+            }
+            
+            // 期限切れキャッシュを削除
+            clearCache.addEventListener('click', function() {
+                fetch(`${API_BASE_URL}/cache/clear`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(`${data.deleted_count}件の期限切れキャッシュを削除しました`);
+                        loadCacheStats();
+                        loadCachedSites();
+                    })
+                    .catch(error => {
+                        alert('キャッシュの削除に失敗しました');
+                    });
+            });
+            
+            // キャッシュ済みサイトの表示/非表示
+            showCachedSites.addEventListener('click', function() {
+                if (cachedSitesContainer.classList.contains('visible')) {
+                    cachedSitesContainer.classList.remove('visible');
+                } else {
+                    cachedSitesContainer.classList.add('visible');
+                    loadCachedSites();
                 }
             });
+            
+            // キャッシュチェックボックスの変更時の処理
+            useCache.addEventListener('change', function() {
+                loadCacheStats();
+                forceRefresh.disabled = !this.checked;
+            });
+            
+            // 詳細設定の表示/非表示を切り替え
+            toggleAdvanced.addEventListener('click', function() {
+                advancedOptions.classList.toggle('visible');
+                toggleAdvanced.textContent = advancedOptions.classList.contains('visible') ? 
+                    '詳細設定を隠す' : '詳細設定を表示';
+            });
+            
+            // サブページチェックボックスの変更時の処理
+            includeSubpages.addEventListener('change', function() {
+                if (this.checked) {
+                    maxPages.disabled = false;
+                    maxDepth.disabled = false;
+                } else {
+                    maxPages.disabled = true;
+                    maxDepth.disabled = true;
+                }
+            });
+            
+            // 初期化時にキャッシュ統計を読み込む
+            loadCacheStats();
+            
+            // チャットボットの初期化
+            initializeBtn.addEventListener('click', function() {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert('URLを入力してください');
+                    return;
+                }
+                
+                // ボタンを無効化し、ステータスを更新
+                initializeBtn.disabled = true;
+                statusElement.textContent = '初期化中...サイト情報を取得しています';
+                
+                // APIにリクエストを送信
+                fetch(`${API_BASE_URL}/initialize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        url: url,
+                        include_subpages: includeSubpages.checked,
+                        max_pages: parseInt(maxPages.value),
+                        max_depth: parseInt(maxDepth.value),
+                        use_cache: useCache.checked,
+                        force_refresh: forceRefresh.checked
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('初期化に失敗しました');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 成功時の処理
+                    statusElement.textContent = data.answer;
+                    
+                    // キャッシュ情報を更新
+                    loadCacheStats();
+                    
+                    // キャッシュ状態に応じたメッセージを表示
+                    let message = `${data.pages_scraped}ページの情報を取得しました。`;
+                    if (useCache.checked) {
+                        const cacheStatus = data.from_cache ? 'キャッシュから読み込み' : '新規取得';
+                        const badgeClass = data.from_cache ? 'cache-hit' : 'cache-miss';
+                        message += ` <span class="cache-badge ${badgeClass}">${cacheStatus}</span>`;
+                    }
+                    message += " 質問してください。";
+                    
+                    addMessage(message, 'bot', true);
+                    
+                    // チャット入力を有効化
+                    messageInput.disabled = false;
+                    sendBtn.disabled = false;
+                    messageInput.focus();
+                })
+                .catch(error => {
+                    // エラー時の処理
+                    statusElement.textContent = error.message;
+                    initializeBtn.disabled = false;
+                });
+            });
+            
+            // メッセージ送信
+            function sendMessage() {
+                const message = messageInput.value.trim();
+                if (!message) {
+                    return;
+                }
+                
+                // ユーザーメッセージをチャット画面に追加
+                addMessage(message, 'user');
+                
+                // 入力フィールドをクリア
+                messageInput.value = '';
+                
+                // ボタンを無効化
+                sendBtn.disabled = true;
+                messageInput.disabled = true;
+                
+                // APIにリクエストを送信
+                fetch(`${API_BASE_URL}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: message })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('質問の送信に失敗しました');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // ボットの回答をチャット画面に追加
+                    addMessage(data.answer, 'bot');
+                    
+                    // 入力を再度有効化
+                    sendBtn.disabled = false;
+                    messageInput.disabled = false;
+                    messageInput.focus();
+                })
+                .catch(error => {
+                    // エラー時の処理
+                    addMessage(`エラー: ${error.message}`, 'bot');
+                    sendBtn.disabled = false;
+                    messageInput.disabled = false;
+                });
+            }
+            
+            // 送信ボタンのクリックイベント
+            sendBtn.addEventListener('click', sendMessage);
+            
+            // Enterキー押下時のイベント
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // メッセージの追加
+            function addMessage(message, sender, allowHTML = false) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+                
+                if (sender === 'user') {
+                    // ユーザーメッセージはプレーンテキスト
+                    messageElement.textContent = message;
+                } else {
+                    // ボットのメッセージはマークダウンとして解析
+                    const markdownDiv = document.createElement('div');
+                    markdownDiv.classList.add('markdown-content');
+                    
+                    if (allowHTML) {
+                        // HTMLを直接許可する場合（キャッシュバッジなど）
+                        markdownDiv.innerHTML = message;
+                    } else {
+                        // マークダウンとして解析
+                        if (typeof marked !== 'undefined') {
+                            markdownDiv.innerHTML = marked.parse(message);
+                        } else {
+                            markdownDiv.textContent = message;
+                        }
+                    }
+                    
+                    messageElement.appendChild(markdownDiv);
+                    
+                    // コードブロックにシンタックスハイライトを適用
+                    if (typeof hljs !== 'undefined') {
+                        messageElement.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                }
+                
+                chatContainer.appendChild(messageElement);
+                
+                // 自動スクロール
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
         }
         
         // ライブラリがロードされたか確認する関数
         function checkLibrariesLoaded() {
             if (typeof marked !== 'undefined' && typeof hljs !== 'undefined') {
-                initializeApp();
+                // DOMが読み込まれているか確認
+                if (document.readyState === 'loading') {
+                    // DOMがまだ読み込まれていない場合は、DOMContentLoadedイベントを待つ
+                    document.addEventListener('DOMContentLoaded', initializeApp);
+                } else {
+                    // DOMがすでに読み込まれている場合は、直接初期化
+                    initializeApp();
+                }
             } else {
                 // ライブラリがまだロードされていない場合、少し待ってから再試行
                 setTimeout(checkLibrariesLoaded, 100);
@@ -740,7 +745,11 @@
         }
         
         // ページロード時にライブラリのロードを確認
-        window.addEventListener('load', checkLibrariesLoaded);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkLibrariesLoaded);
+        } else {
+            checkLibrariesLoaded();
+        }
     </script>
 </body>
 </html> 
