@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ウェブサイト情報チャットボット</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .url-form {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .url-input-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .url-form input[type="url"] {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+        }
+        .url-form button {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+        }
+        .subpage-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .subpage-option input {
+            margin-right: 8px;
+        }
+        .chat-container {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .user-message {
+            background-color: #f1f1f1;
+            text-align: right;
+        }
+        .bot-message {
+            background-color: #e3f2fd;
+        }
+        .chat-form {
+            display: flex;
+        }
+        .chat-form input {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+        }
+        .chat-form button {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+        }
+        .status {
+            text-align: center;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>ウェブサイト情報チャットボット</h1>
+    
+    <div class="status" id="status">URLを入力してチャットボットを初期化してください</div>
+    
+    <div class="url-form">
+        <div class="url-input-row">
+            <input type="url" id="url-input" placeholder="https://example.com">
+            <button id="initialize-btn">初期化</button>
+        </div>
+        <div class="subpage-option">
+            <input type="checkbox" id="include-subpages" checked>
+            <label for="include-subpages">サブページも含めてスクレイピングする（より多くの情報を取得できますが、時間がかかります）</label>
+        </div>
+    </div>
+    
+    <div class="chat-container" id="chat-container">
+        <!-- メッセージはここに表示されます -->
+    </div>
+    
+    <div class="chat-form">
+        <input type="text" id="message-input" placeholder="質問を入力..." disabled>
+        <button id="send-btn" disabled>送信</button>
+    </div>
+    
+    <script>
+        // DOMが読み込まれたら実行
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlInput = document.getElementById('url-input');
+            const includeSubpages = document.getElementById('include-subpages');
+            const initializeBtn = document.getElementById('initialize-btn');
+            const messageInput = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+            const chatContainer = document.getElementById('chat-container');
+            const statusElement = document.getElementById('status');
+            
+            // APIのベースURL（必要に応じて変更）
+            const API_BASE_URL = 'http://localhost:8000';
+            
+            // チャットボットの初期化
+            initializeBtn.addEventListener('click', function() {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert('URLを入力してください');
+                    return;
+                }
+                
+                // ボタンを無効化し、ステータスを更新
+                initializeBtn.disabled = true;
+                statusElement.textContent = '初期化中...サイト情報を取得しています';
+                
+                // APIにリクエストを送信
+                fetch(`${API_BASE_URL}/initialize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        url: url,
+                        include_subpages: includeSubpages.checked
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('初期化に失敗しました');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 成功時の処理
+                    statusElement.textContent = data.answer;
+                    
+                    // チャット入力を有効化
+                    messageInput.disabled = false;
+                    sendBtn.disabled = false;
+                    messageInput.focus();
+                })
+                .catch(error => {
+                    // エラー時の処理
+                    statusElement.textContent = error.message;
+                    initializeBtn.disabled = false;
+                });
+            });
+            
+            // メッセージ送信
+            function sendMessage() {
+                const message = messageInput.value.trim();
+                if (!message) {
+                    return;
+                }
+                
+                // ユーザーメッセージをチャット画面に追加
+                addMessage(message, 'user');
+                
+                // 入力フィールドをクリア
+                messageInput.value = '';
+                
+                // ボタンを無効化
+                sendBtn.disabled = true;
+                messageInput.disabled = true;
+                
+                // APIにリクエストを送信
+                fetch(`${API_BASE_URL}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: message })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('質問の送信に失敗しました');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // ボットの回答をチャット画面に追加
+                    addMessage(data.answer, 'bot');
+                    
+                    // 入力を再度有効化
+                    sendBtn.disabled = false;
+                    messageInput.disabled = false;
+                    messageInput.focus();
+                })
+                .catch(error => {
+                    // エラー時の処理
+                    addMessage(`エラー: ${error.message}`, 'bot');
+                    sendBtn.disabled = false;
+                    messageInput.disabled = false;
+                });
+            }
+            
+            // 送信ボタンのクリックイベント
+            sendBtn.addEventListener('click', sendMessage);
+            
+            // Enterキー押下時のイベント
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // メッセージの追加
+            function addMessage(message, sender) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+                messageElement.textContent = message;
+                
+                chatContainer.appendChild(messageElement);
+                
+                // 自動スクロール
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html> 
