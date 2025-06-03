@@ -337,31 +337,8 @@
     </div>
     
     <script>
-        // ライブラリのロードを確認してから実行する関数
-        function initializeApp() {
-            // マークダウンのオプション設定
-            if (typeof marked !== 'undefined') {
-                marked.setOptions({
-                    breaks: true,  // 改行を有効にする
-                    gfm: true,     // GitHub Flavored Markdownを有効にする
-                    highlight: function(code, lang) {
-                        // シンタックスハイライトを適用
-                        try {
-                            if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
-                                return hljs.highlight(code, { language: lang }).value;
-                            }
-                            return code;
-                        } catch (e) {
-                            console.warn('ハイライト処理中にエラーが発生しました:', e);
-                            return code;
-                        }
-                    }
-                });
-            } else {
-                console.error('marked ライブラリがロードされていません');
-            }
-            
-            // DOM要素の取得
+        // DOMが読み込まれたら実行
+        document.addEventListener('DOMContentLoaded', function() {
             const urlInput = document.getElementById('url-input');
             const includeSubpages = document.getElementById('include-subpages');
             const maxPages = document.getElementById('max-pages');
@@ -381,6 +358,28 @@
             const showCachedSites = document.getElementById('show-cached-sites');
             const cachedSitesContainer = document.getElementById('cached-sites-container');
             const cachedSitesList = document.getElementById('cached-sites-list');
+            
+            // マークダウンのオプション設定
+            try {
+                marked.setOptions({
+                    breaks: true,  // 改行を有効にする
+                    gfm: true,     // GitHub Flavored Markdownを有効にする
+                    highlight: function(code, lang) {
+                        // シンタックスハイライトを適用
+                        try {
+                            if (lang && hljs.getLanguage(lang)) {
+                                return hljs.highlight(code, { language: lang }).value;
+                            }
+                            return code;
+                        } catch (e) {
+                            console.warn('ハイライト処理中にエラーが発生しました:', e);
+                            return code;
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('marked設定中にエラーが発生しました:', e);
+            }
             
             // APIのベースURL（必要に応じて変更）
             const API_BASE_URL = 'http://localhost:8000';
@@ -709,11 +708,7 @@
                     } else {
                         // マークダウンとして解析
                         try {
-                            if (typeof marked !== 'undefined') {
-                                markdownDiv.innerHTML = marked.parse(message);
-                            } else {
-                                markdownDiv.textContent = message;
-                            }
+                            markdownDiv.innerHTML = marked.parse(message);
                         } catch (e) {
                             console.warn('マークダウン変換中にエラーが発生しました:', e);
                             markdownDiv.textContent = message;
@@ -724,15 +719,13 @@
                     
                     // コードブロックにシンタックスハイライトを適用
                     try {
-                        if (typeof hljs !== 'undefined') {
-                            messageElement.querySelectorAll('pre code').forEach((block) => {
-                                try {
-                                    hljs.highlightElement(block);
-                                } catch (e) {
-                                    console.warn('コードブロックのハイライト中にエラーが発生しました:', e);
-                                }
-                            });
-                        }
+                        messageElement.querySelectorAll('pre code').forEach((block) => {
+                            try {
+                                hljs.highlightElement(block);
+                            } catch (e) {
+                                console.warn('コードブロックのハイライト中にエラーが発生しました:', e);
+                            }
+                        });
                     } catch (e) {
                         console.warn('ハイライト処理中にエラーが発生しました:', e);
                     }
@@ -743,31 +736,7 @@
                 // 自動スクロール
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
-        }
-        
-        // ライブラリがロードされたか確認する関数
-        function checkLibrariesLoaded() {
-            if (typeof marked !== 'undefined' && typeof hljs !== 'undefined') {
-                // DOMが読み込まれているか確認
-                if (document.readyState === 'loading') {
-                    // DOMがまだ読み込まれていない場合は、DOMContentLoadedイベントを待つ
-                    document.addEventListener('DOMContentLoaded', initializeApp);
-                } else {
-                    // DOMがすでに読み込まれている場合は、直接初期化
-                    initializeApp();
-                }
-            } else {
-                // ライブラリがまだロードされていない場合、少し待ってから再試行
-                setTimeout(checkLibrariesLoaded, 100);
-            }
-        }
-        
-        // ページロード時にライブラリのロードを確認
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', checkLibrariesLoaded);
-        } else {
-            checkLibrariesLoaded();
-        }
+        });
     </script>
 </body>
 </html> 
