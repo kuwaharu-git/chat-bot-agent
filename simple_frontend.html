@@ -508,6 +508,9 @@
                     
                     // キャッシュサイト一覧を非表示
                     cachedSitesContainer.classList.remove('visible');
+                    
+                    // 初期化ボタンを再度有効化
+                    initializeBtn.disabled = false;
                 })
                 .catch(error => {
                     // エラー時の処理
@@ -622,6 +625,9 @@
                     messageInput.disabled = false;
                     sendBtn.disabled = false;
                     messageInput.focus();
+                    
+                    // 初期化ボタンを再度有効化
+                    initializeBtn.disabled = false;
                 })
                 .catch(error => {
                     // エラー時の処理
