@@ -24,27 +24,35 @@ class GeminiChatbot:
         self.use_cache = use_cache
         self.cache_expire_days = cache_expire_days
         
-    def initialize_with_url(self, url=None, include_subpages=True, max_pages=10, max_depth=2):
-        """指定されたURLからコンテンツを取得してチャットボットを初期化する"""
-        # ウェブサイトからコンテンツを取得
-        print(f"ウェブサイト {url} からコンテンツを取得しています...")
-        
-        if include_subpages:
-            # サブページも含めて取得
-            print(f"サブページも含めてスクレイピングします（最大{max_pages}ページ、深さ{max_depth}まで）...")
-            scraped_data = self.scraper.scrape_with_subpages(url, max_pages=max_pages, max_depth=max_depth)
-            pages_count = len(self.scraper.visited_urls)
-            print(f"合計 {pages_count} ページの情報を取得しました。")
-        else:
-            # メインページのみ取得
-            scraped_data = self.scraper.scrape(url)
-            pages_count = 1
-        
-        if not scraped_data:
-            return False, "ウェブサイトからの情報取得に失敗しました。"
+    def initialize_with_url(self, url, include_subpages=True, max_pages=10, max_depth=2):
+        """指定したURLでスクレイパーを初期化する"""
+        try:
+            # スクレイパーの初期化
+            self.scraper = WebScraper(url=url, use_cache=self.use_cache, cache_expire_days=7, respect_robots_txt=True)
             
-        # システムプロンプトを作成
-        system_prompt = f"""
+            # URLが有効かどうかを確認
+            if not url.startswith(('http://', 'https://')):
+                return False, "エラー: 有効なURLを入力してください（http://またはhttps://で始まるURL）"
+            
+            # ウェブサイトからコンテンツを取得
+            print(f"ウェブサイト {url} からコンテンツを取得しています...")
+            
+            if include_subpages:
+                # サブページも含めて取得
+                print(f"サブページも含めてスクレイピングします（最大{max_pages}ページ、深さ{max_depth}まで）...")
+                scraped_data = self.scraper.scrape_with_subpages(url, max_pages=max_pages, max_depth=max_depth)
+                pages_count = len(self.scraper.visited_urls)
+                print(f"合計 {pages_count} ページの情報を取得しました。")
+            else:
+                # メインページのみ取得
+                scraped_data = self.scraper.scrape(url)
+                pages_count = 1
+            
+            if not scraped_data:
+                return False, "ウェブサイトからの情報取得に失敗しました。"
+            
+            # システムプロンプトを作成
+            system_prompt = f"""
 あなたは次のウェブページの内容に基づいて質問に答えるアシスタントです。
 ウェブページのタイトル: {scraped_data['title']}
 ウェブページのURL: {scraped_data['url']}
@@ -67,21 +75,23 @@ class GeminiChatbot:
 
 回答は構造化し、読みやすく整形してください。
 """
-        
-        # 会話を初期化
-        self.chat = self.model.start_chat(history=[])
-        
-        # システムプロンプトを送信
-        print("チャットボットを初期化しています...")
-        self.chat.send_message(system_prompt)
-        
-        # 会話履歴をクリア
-        self.chat_history = []
-        
-        # キャッシュ情報を表示
-        cache_status = "キャッシュから読み込み" if self.use_cache and any(url in str(self.scraper.visited_urls) for url in self.scraper.visited_urls) else "新規取得"
-        
-        return True, f"{pages_count}ページの情報を取得しました（{cache_status}）。チャットボットの準備ができました。"
+            
+            # 会話を初期化
+            self.chat = self.model.start_chat(history=[])
+            
+            # システムプロンプトを送信
+            print("チャットボットを初期化しています...")
+            self.chat.send_message(system_prompt)
+            
+            # 会話履歴をクリア
+            self.chat_history = []
+            
+            # キャッシュ情報を表示
+            cache_status = "キャッシュから読み込み" if self.use_cache and any(url in str(self.scraper.visited_urls) for url in self.scraper.visited_urls) else "新規取得"
+            
+            return True, f"{pages_count}ページの情報を取得しました（{cache_status}）。チャットボットの準備ができました。"
+        except Exception as e:
+            return False, f"エラーが発生しました: {str(e)}"
     
     def ask(self, question):
         """質問を受け取り、回答を返す"""

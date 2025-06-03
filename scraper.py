@@ -6,9 +6,10 @@ import time
 import re
 from urllib.parse import urljoin, urlparse
 from db_manager import DBManager
+import urllib.robotparser
 
 class WebScraper:
-    def __init__(self, url=None, use_cache=True, cache_expire_days=7):
+    def __init__(self, url=None, use_cache=True, cache_expire_days=7, respect_robots_txt=True):
         self.url = url or TARGET_WEBSITE_URL
         self.converter = html2text.HTML2Text()
         self.converter.ignore_links = False
@@ -21,13 +22,59 @@ class WebScraper:
         self.cache_expire_days = cache_expire_days
         self.db_manager = DBManager() if use_cache else None
         
+        # robots.txt設定
+        self.respect_robots_txt = respect_robots_txt
+        self.rp = urllib.robotparser.RobotFileParser()
+        self.robots_cache = {}  # ドメインごとのrobots.txtキャッシュ
+        self.user_agent = 'Mozilla/5.0 (compatible; ChatBotAgent/1.0)'
+        
+    def check_robots_txt(self, url):
+        """robots.txtをチェックして、URLへのアクセスが許可されているかを確認する"""
+        if not self.respect_robots_txt:
+            return True
+            
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
+        
+        # 同じドメインのrobots.txtを既に確認済みの場合はキャッシュを使用
+        if domain in self.robots_cache:
+            return self.robots_cache[domain].can_fetch(self.user_agent, url)
+            
+        # robots.txtのURLを構築
+        robots_url = f"{parsed_url.scheme}://{domain}/robots.txt"
+        
+        try:
+            # robots.txtを取得して解析
+            rp = urllib.robotparser.RobotFileParser()
+            rp.set_url(robots_url)
+            rp.read()
+            
+            # キャッシュに保存
+            self.robots_cache[domain] = rp
+            
+            # アクセスが許可されているかチェック
+            allowed = rp.can_fetch(self.user_agent, url)
+            if not allowed:
+                print(f"robots.txtによりアクセスが禁止されています: {url}")
+            return allowed
+            
+        except Exception as e:
+            print(f"robots.txtの確認中にエラーが発生しました: {e}")
+            # エラーが発生した場合は許可されていると仮定
+            return True
+        
     def fetch_content(self, url=None):
         """指定されたURLからウェブページの内容を取得する"""
         target_url = url or self.url
         
+        # robots.txtをチェック
+        if not self.check_robots_txt(target_url):
+            print(f"robots.txtによりアクセスが禁止されているため、コンテンツを取得しません: {target_url}")
+            return None
+        
         try:
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': self.user_agent
             }
             response = requests.get(target_url, headers=headers, timeout=10)
             response.raise_for_status()
@@ -180,6 +227,11 @@ class WebScraper:
                     "url": cached_data["url"]
                 }
         
+        # robots.txtをチェック
+        if not self.check_robots_txt(target_url):
+            print(f"robots.txtによりアクセスが禁止されています: {target_url}")
+            return None
+        
         # キャッシュにない場合は新たに取得
         html_content = self.fetch_content(target_url)
         return self.parse_html(html_content)
@@ -197,6 +249,9 @@ class WebScraper:
             href = a_tag['href']
             if self.is_valid_url(href, base_url):
                 full_url = urljoin(base_url, href)
+                # robots.txtをチェック
+                if self.respect_robots_txt and not self.check_robots_txt(full_url):
+                    continue
                 links.append(full_url)
         
         # 重複を削除
@@ -217,6 +272,11 @@ class WebScraper:
                     "content": cached_data["content"],
                     "url": cached_data["url"]
                 }
+        
+        # robots.txtをチェック
+        if not self.check_robots_txt(target_url):
+            print(f"robots.txtによりアクセスが禁止されています: {target_url}")
+            return None
         
         # キャッシュにない場合は新たに取得
         self.visited_urls = set()  # 訪問済みURLをリセット
@@ -262,6 +322,10 @@ class WebScraper:
                 if len(self.visited_urls) >= max_pages:
                     break
                 
+                # robots.txtをチェック
+                if not self.check_robots_txt(link):
+                    continue
+                
                 print(f"サブページをスクレイピング中 ({len(self.visited_urls)}/{max_pages}): {link}")
                 sub_data = self.scrape(link)
                 self.visited_urls.add(link)
@@ -294,7 +358,7 @@ class WebScraper:
 
 # 使用例
 if __name__ == "__main__":
-    scraper = WebScraper(use_cache=True)
+    scraper = WebScraper(use_cache=True, respect_robots_txt=True)
     url = input("スクレイピングするURLを入力してください: ")
     data = scraper.scrape_with_subpages(url, max_pages=10, max_depth=2)
     if data:
