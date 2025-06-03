@@ -1,8 +1,10 @@
 @echo off
+setlocal
+
 echo ウェブサイト情報チャットボットのセットアップを開始します...
 
 REM Pythonが利用可能か確認
-python --version >nul 2>&1
+where python >nul 2>nul
 if %ERRORLEVEL% neq 0 (
     echo Python 3がインストールされていません。インストールしてください。
     exit /b 1
@@ -14,7 +16,7 @@ python -m venv venv
 
 REM 仮想環境の有効化
 echo 仮想環境を有効化しています...
-call venv\Scripts\activate.bat
+call venv\Scripts\activate
 
 REM 依存関係のインストール
 echo 依存関係をインストールしています...
@@ -47,6 +49,7 @@ echo セットアップが完了しました！
 echo 1. .envファイルにGemini APIキーを設定してください。
 echo 2. 仮想環境を有効化するには、次のコマンドを実行してください: venv\Scripts\activate
 echo 3. コマンドラインインターフェースを使用するには: python chatbot.py
-echo 4. Web APIを起動するには: python app.py
+echo 4. Web APIを起動するには: python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+echo 5. ウェブインターフェースにアクセスするには: ブラウザでsimple_frontend.htmlを開いてください
 
-pause 
+endlocal 

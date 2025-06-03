@@ -5,9 +5,12 @@
 ## 機能
 
 - 指定されたURLからウェブサイトの内容を抽出
+- サブページの探索と情報収集
 - 抽出した情報を基にユーザーの質問に回答
+- SQLiteによるキャッシュ機能
 - コマンドラインインターフェース
 - Web API（FastAPI）による提供
+- シンプルなHTMLフロントエンド
 
 ## 前提条件
 
@@ -71,13 +74,24 @@ python chatbot.py
 ### Web API
 
 ```bash
-python app.py
+python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-APIエンドポイント:
+### ウェブインターフェース
+
+1. サーバーを起動した後、ブラウザで`simple_frontend.html`ファイルを開きます
+2. URLを入力するか、キャッシュされたサイトを選択してチャットボットを初期化します
+3. 質問を入力して回答を取得します
+
+## APIエンドポイント
+
 - `POST /initialize` - チャットボットを特定のURLで初期化
 - `POST /ask` - 質問を送信して回答を取得
 - `GET /history` - チャット履歴を取得
+- `GET /cache/stats` - キャッシュ統計情報を取得
+- `GET /cache/sites` - キャッシュされたサイト一覧を取得
+- `POST /initialize/cached/{site_id}` - キャッシュされたサイトでチャットボットを初期化
+- `POST /cache/clear` - 期限切れキャッシュを削除
 
 ## APIリクエスト例
 
@@ -86,7 +100,7 @@ APIエンドポイント:
 ```bash
 curl -X POST "http://localhost:8000/initialize" \
      -H "Content-Type: application/json" \
-     -d '{"url": "https://example.com"}'
+     -d '{"url": "https://example.com", "include_subpages": true, "max_pages": 10, "max_depth": 2}'
 ```
 
 ### 質問の送信
@@ -97,10 +111,16 @@ curl -X POST "http://localhost:8000/ask" \
      -d '{"question": "このウェブサイトについて教えてください"}'
 ```
 
-### チャット履歴の取得
+### キャッシュされたサイトの取得
 
 ```bash
-curl -X GET "http://localhost:8000/history"
+curl -X GET "http://localhost:8000/cache/sites"
+```
+
+### キャッシュされたサイトで初期化
+
+```bash
+curl -X POST "http://localhost:8000/initialize/cached/1"
 ```
 
 ## プロジェクト構造
@@ -108,7 +128,9 @@ curl -X GET "http://localhost:8000/history"
 - `scraper.py` - ウェブサイトのスクレイピング機能
 - `chatbot.py` - Gemini APIを使用したチャットボット機能
 - `app.py` - FastAPIを使用したWeb API
+- `db_manager.py` - SQLiteキャッシュ管理
 - `config.py` - 設定ファイル
+- `simple_frontend.html` - シンプルなウェブインターフェース
 - `requirements.txt` - 依存関係リスト
 
 ## ライセンス
