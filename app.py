@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from chatbot import GeminiChatbot
+from chatbot import OllmaChatbot
 from config import API_HOST, API_PORT
 import uvicorn
 from db_manager import DBManager
@@ -25,7 +25,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="."), name="static")
 
 # グローバルチャットボットインスタンス
-chatbot = GeminiChatbot(use_cache=True)
+chatbot = OllmaChatbot(use_cache=True)
 
 # データベースマネージャー
 db_manager = DBManager()

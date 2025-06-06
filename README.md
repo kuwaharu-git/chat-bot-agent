@@ -1,6 +1,6 @@
 # ウェブサイト情報チャットボット
 
-このプロジェクトは、指定したウェブサイトの情報を取得し、その内容に基づいて質問に答えるチャットボットです。Google Gemini APIを使用して自然言語処理を行います。
+このプロジェクトは、指定したウェブサイトの情報を取得し、その内容に基づいて質問に答えるチャットボットです。Ollamaを使用して自然言語処理を行います。
 
 ## 機能
 
@@ -11,14 +11,14 @@
 - コマンドラインインターフェース
 - Web API（FastAPI）による提供
 - シンプルなHTMLフロントエンド
+- Ollama（ローカルLLM）によるAI処理
 
 ## 前提条件
 
 - Python 3.8以上
-- Google Gemini API キー
-  - [Google AI Studio](https://ai.google.dev/)からAPIキーを取得する必要があります
-  - Gemini APIは一部の国や地域では利用できない場合があります
-  - 使用するモデル（デフォルト: gemini-pro）がGoogle AIのAPIで利用可能であることを確認してください
+- Ollama
+  - [Ollama](https://ollama.com/)をインストールしてローカルで実行
+  - デフォルトでは、llama3モデルを使用
 
 ## セットアップ
 
@@ -52,9 +52,6 @@ pip install -r requirements.txt
 `.env`ファイルをプロジェクトのルートディレクトリに作成し、以下の内容を設定します：
 
 ```
-# Google Gemini APIキー
-GOOGLE_API_KEY=your_google_api_key_here
-
 # ターゲットのウェブサイトURL（デフォルト）
 TARGET_WEBSITE_URL=https://example.com
 
@@ -62,11 +59,14 @@ TARGET_WEBSITE_URL=https://example.com
 API_HOST=0.0.0.0
 API_PORT=8000
 
-# Geminiモデル設定
-GEMINI_MODEL_NAME=gemini-pro
+# Ollama設定
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL_NAME=llama3
 ```
 
-**重要**: 使用するモデル名（`GEMINI_MODEL_NAME`）は、Google AIのAPIで提供されているモデルと一致している必要があります。モデルの可用性は地域やアカウントの種類によって異なる場合があります。最新の情報は[Google AIのドキュメント](https://ai.google.dev/docs)を参照してください。
+**重要**: 
+- Ollamaがローカルで実行されていることを確認してください。
+- 必要に応じて`OLLAMA_BASE_URL`と`OLLAMA_MODEL_NAME`を環境に合わせて変更してください。
 
 ## 使用方法
 
@@ -136,7 +136,7 @@ curl -X POST "http://localhost:8000/initialize/cached/1"
 ## プロジェクト構造
 
 - `scraper.py` - ウェブサイトのスクレイピング機能
-- `chatbot.py` - Gemini APIを使用したチャットボット機能
+- `chatbot.py` - Ollama APIを使用したチャットボット機能
 - `app.py` - FastAPIを使用したWeb API
 - `db_manager.py` - SQLiteキャッシュ管理
 - `config.py` - 設定ファイル
